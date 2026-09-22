@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Learning Video System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+            margin-top: 0;
+        }
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            height: 0;
+            overflow: hidden;
+            background: #000;
+            border-radius: 6px;
+        }
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn-next {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-next:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .status {
+            font-weight: bold;
+            color: #d9534f;
+        }
+        .status.success {
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 id="video-title">บทเรียนที่ 1: กำลังโหลด...</h2>
+    
+    <!-- YouTube Player Container -->
+    <div class="video-container">
+        <div id="player"></div>
+    </div>
+
+    <div class="controls">
+        <div id="status-text" class="status">สถานะ: กรุณาดูวิดีโอให้จบเพื่อปลดล็อคบทเรียนถัดไป</div>
+        <button id="next-btn" class="btn btn-next" disabled onclick="nextVideo()">บทเรียนถัดไป &rarr;</button>
+    </div>
+</div>
+
+<script>
+    // รายชื่อ Video ID จาก YouTube และชื่อบทเรียน
+    const playlist = [
+        { id: 'Engku8MhzYo', title: 'บทเรียนที่ 1: พื้นฐานการพัฒนาเว็บ' },
+        { id: 'jNQXAC9IVRw', title: 'บทเรียนที่ 2: การเขียน JavaScript เบื้องต้น' },
+        { id: 'tgbNymZ7vqY', title: 'บทเรียนที่ 3: สรุปเนื้อหาและแนวข้อสอบ' }
+    ];
+
+    let currentVideoIndex = 0;
+    let player;
+    let lastTime = 0;
+    let checkInterval;
+    let isSeekingLocked = true;
+
+    // โหลด YouTube IFrame Player API
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // ฟังก์ชันสร้างตัวเล่นวิดีโอหลังจาก API โหลดเสร็จ
+    function onYouTubeIframeAPIReady() {
+        loadVideo();
+    }
+
+    function loadVideo() {
+        const currentVideo = playlist[currentVideoIndex];
+        document.getElementById('video-title').innerText = currentVideo.title;
+        document.getElementById('next-btn').disabled = true;
+        document.getElementById('status-text').innerText = "สถานะ: กรุณาดูวิดีโอให้จบเพื่อปลดล็อคบทเรียนถัดไป";
+        document.getElementById('status-text').className = "status";
+        
+        lastTime = 0;
+        isSeekingLocked = true;
+
+        if (player) {
+            player.loadVideoById(currentVideo.id);
+        } else {
+            player = new YT.Player('player', {
+                height: '100%',
+                width: '100%',
+                videoId: currentVideo.id,
+                playerVars: {
+                    'rel': 0,
+                    'controls': 1, // เปิดไว้เพื่อให้ดูเวลาได้ แต่สคริปต์จะบล็อกการข้าม
+                    'disablekb': 1 // ปิดการใช้คีย์บอร์ด (เช่น ปุ่มลูกศรขวาเพื่อข้าม)
+                },
+                events: {
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+    }
+
+    // ตรวจจับสถานะการเล่นวิดีโอ
+    function onPlayerStateChange(event) {
+        if (event.data == YT.PlayerState.PLAYING) {
+            // เริ่มเช็คตำแหน่งเวลาทุกๆ 0.5 วินาที
+            checkInterval = setInterval(checkTime, 500);
+        } else {
+            clearInterval(checkInterval);
+        }
+
+        // เมื่อวิดีโอเล่นจนจบ (Ended)
+        if (event.data == YT.PlayerState.ENDED) {
+            isSeekingLocked = false; // ปลดล็อคให้กดย้อนดูได้อิสระ
+            document.getElementById('status-text').innerText = "สถานะ: เรียนจบแล้ว! สามารถไปบทเรียนถัดไปได้";
+            document.getElementById('status-text').className = "status success";
+            document.getElementById('next-btn').disabled = false;
+        }
+    }
+
+    // ฟังก์ชันป้องกันการ Seek ไปข้างหน้า
+    function checkTime() {
+        if (!player || !isSeekingLocked) return;
+
+        let currentTime = player.getCurrentTime();
+
+        // ถ้าเวลาปัจจุบันกระโดดไปข้างหน้ามากกว่า 2 วินาทีจากเวลาล่าสุดที่บันทึกไว้
+        if (currentTime - lastTime > 2) {
+            player.seekTo(lastTime); // ดึงเวลากลับมาที่จุดล่าสุดที่ดูจริง
+            alert("ไม่อนุญาตให้กดข้ามวิดีโอ! กรุณาเรียนตามลำดับ");
+        } else {
+            // อัปเดตเวลาล่าสุด (แต่ป้องกันไม่ให้อัปเดตถ้าวิดีโอกำลังถอยหลัง เพื่อให้กดย้อนกลับไปดูซ้ำได้)
+            if (currentTime > lastTime) {
+                lastTime = currentTime;
+            }
+        }
+    }
+
+    // ฟังก์ชันเปลี่ยนไปวิดีโอถัดไป
+    function nextVideo() {
+        if (currentVideoIndex < playlist.length - 1) {
+            currentVideoIndex++;
+            loadVideo();
+        } else {
+            alert("ยินดีด้วย! คุณเรียนจบครบทุกบทเรียนแล้ว");
+        }
+    }
+</script>
+
+</body>
+</html>
